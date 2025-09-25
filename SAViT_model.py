@@ -218,13 +218,9 @@ class MixPool(nn.Module):
         S = int(math.sqrt(S2))
         assert S * S == S2, "S^2 must be perfect square (tokens per region)"
 
-        # Build Z_mix: [B, S^2, K, K, D]
         Z_mix = torch.stack(tilde_list, dim=2)  # [B, S^2, K^2, D]
         Z_mix = Z_mix.view(B, S2, K, K, D)
 
-        # For each token position t in [0..S^2-1], we pool across the KxK region grid
-        # to get an [S x S] map per scale, then flatten -> [S^2, D].
-        # We implement this efficiently by permuting dims to [B*S^2, D, K, K].
         Z_rg = Z_mix.permute(0, 1, 4, 2, 3).contiguous().view(B * S2, D, K, K)  # [B*S2, D, K, K]
 
         pooled_sum = torch.zeros(B * S2, D, S, S, device=Z_rg.device, dtype=Z_rg.dtype)
