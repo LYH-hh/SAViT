@@ -346,7 +346,3 @@ if __name__ == '__main__':
     if args.output_dir:
         Path(args.output_dir).mkdir(parents=True, exist_ok=True)
     main(args)
-
-#CUDA_VISIBLE_DEVICES=4 python train_SAViT.py
-#CUDA_VISIBLE_DEVICES=3,4 python -m torch.distributed.launch --nproc_per_node=2 train_SAViT.py
-#CUDA_VISIBLE_DEVICES=4,5,6,7 python -m torch.distributed.launch --nproc_per_node=2 --master_port=29501 train_SAViT.py
