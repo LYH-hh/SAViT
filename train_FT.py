@@ -276,10 +276,6 @@ def main(args):
     model.to(device)
 
     model_without_ddp = model
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-    print("Model = %s" % str(model_without_ddp))
-    print('number of params (M): %.2f' % (n_parameters / 1.e6))
 
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
     
@@ -355,8 +351,7 @@ def main(args):
             log_writer.add_scalar('perf/val_loss', val_stats['loss'], epoch)
             
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        'epoch': epoch,
-                        'n_parameters': n_parameters}
+                        'epoch': epoch}
 
         if args.output_dir and misc.is_main_process():
             if log_writer is not None:
