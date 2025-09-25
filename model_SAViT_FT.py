@@ -7,7 +7,6 @@ import torch.nn.functional as F
 
 
 class DropPath(nn.Module):
-    """Drop paths (Stochastic Depth) per sample (when applied in main path of residual layers)."""
     def __init__(self, drop_prob: float = 0.0):
         super().__init__()
         self.drop_prob = drop_prob
@@ -27,7 +26,6 @@ def trunc_normal_(tensor, std=0.02):
 
 
 def cosine_schedule(val_min: float, val_max: float, t: int, T: int) -> float:
-    """Cosine schedule in [val_min, val_max] for step t in [0, T-1]."""
     if T <= 1:
         return val_max
     cos_t = 0.5 * (1 + math.cos(math.pi * t / (T - 1)))
@@ -36,7 +34,6 @@ def cosine_schedule(val_min: float, val_max: float, t: int, T: int) -> float:
 
 
 class PatchEmbed(nn.Module):
-    """(B,C,H,W) -> (B, H'*W', D) with H'=H/P, W'=W/P."""
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
         super().__init__()
         assert img_size % patch_size == 0, "img_size must be divisible by patch_size"
@@ -73,9 +70,6 @@ class MLP(nn.Module):
 
 
 class LrMSA(nn.Module):
-    """
-    Low-rank MSA: Q,K have reduced dim d/τ, V keeps full dim d.
-    """
     def __init__(self, dim, num_heads=8, attn_drop=0.0, proj_drop=0.0, qkv_bias=True):
         super().__init__()
         self.num_heads = num_heads
@@ -88,9 +82,6 @@ class LrMSA(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        x: [B, N, D]
-        """
         B, N, D = x.shape
         qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, D // self.num_heads).permute(2, 0, 3, 1, 4)
         q, k, v = qkv[0], qkv[1], qkv[2]
@@ -122,10 +113,6 @@ class LrViTBlock(nn.Module):
 
 
 class CrossAttention(nn.Module):
-    """
-    Q from Z_i (full dim), K,V from AP^i via linear projections.
-    Multi-head, standard dims (no reduction here; reduction happens in Lr-MSA later).
-    """
     def __init__(self, dim, num_heads=8, attn_drop=0.0, proj_drop=0.0):
         super().__init__()
         assert dim % num_heads == 0
@@ -213,8 +200,6 @@ class SPA(nn.Module):
                 AP_prev = x.detach()  
         return tilde
 
-# ---------------------- MixPool ----------------------
-
 class MixPool(nn.Module):
     def __init__(self, dim, num_heads, tau=4, mlp_ratio=4.0,
                  drop=0.0, attn_drop=0.0, drop_path=0.0,
@@ -234,40 +219,29 @@ class MixPool(nn.Module):
         S = int(math.sqrt(S2))
         assert S * S == S2, "S^2 must be perfect square (tokens per region)"
 
-        # Build Z_mix: [B, S^2, K, K, D]
-        Z_mix = torch.stack(tilde_list, dim=2)  # [B, S^2, K^2, D]
+        Z_mix = torch.stack(tilde_list, dim=2)
         Z_mix = Z_mix.view(B, S2, K, K, D)
-
-        # For each token position t in [0..S^2-1], we pool across the KxK region grid
-        # to get an [S x S] map per scale, then flatten -> [S^2, D].
-        # We implement this efficiently by permuting dims to [B*S^2, D, K, K].
-        Z_rg = Z_mix.permute(0, 1, 4, 2, 3).contiguous().view(B * S2, D, K, K)  # [B*S2, D, K, K]
+        Z_rg = Z_mix.permute(0, 1, 4, 2, 3).contiguous().view(B * S2, D, K, K)  
 
         pooled_sum = torch.zeros(B * S2, D, S, S, device=Z_rg.device, dtype=Z_rg.dtype)
 
         if self.scales is None:
-            # Use 3 adaptive scales mapping KxK -> SxS (equation guarantees output length S^2)
-            # scale 1: direct adaptive average
             p1 = F.adaptive_avg_pool2d(Z_rg, (S, S))
-            # scale 2: pre-smooth with 3x3 then adaptive
             p2 = F.avg_pool2d(Z_rg, kernel_size=3, stride=1, padding=1)
             p2 = F.adaptive_avg_pool2d(p2, (S, S))
-            # scale 3: coarser 5x5 smoothing then adaptive
             p3 = F.avg_pool2d(Z_rg, kernel_size=5, stride=1, padding=2)
             p3 = F.adaptive_avg_pool2d(p3, (S, S))
             pooled_sum = p1 + p2 + p3
         else:
-            # Use explicit (kh, kw, sh, sw), then adapt to (S,S) if needed
             for (kh, kw, sh, sw) in self.scales:
                 out = F.avg_pool2d(Z_rg, kernel_size=(kh, kw), stride=(sh, sw), ceil_mode=False)
                 if out.shape[-2:] != (S, S):
                     out = F.adaptive_avg_pool2d(out, (S, S))
                 pooled_sum = pooled_sum + out
 
-        # Sum scales and reshape back to [B, S^2, D]
+        
         pooled_sum = pooled_sum.view(B, S2, D, S, S).mean(dim=(-1, -2))  # average spatial SxS (per spec eq. keeps S^2 length)
-        # NOTE: each token index collects region-global context at multiple scales -> [B, S^2, D]
-
+        
         # Lr-ViT over the mixed sequence
         x = self.theta_mp(pooled_sum)     # [B, S^2, D]
         x = self.norm(x)
