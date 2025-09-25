@@ -277,24 +277,6 @@ def main(args):
 
     model_without_ddp = model
 
-    print("==== Trainable Parameters ====")
-    total, trainable, max_depth= 0, 0, 3
-    for name, param in model_without_ddp.named_parameters():
-        total += param.numel()
-        if param.requires_grad:
-            trainable += param.numel()
-            print(f"[Trainable] {name:60s} {tuple(param.shape)} -> {param.numel():,} params")
-        else:
-            if max_depth > 0:
-                # 只展示冻结的大模块名，不打印到底层
-                parts = name.split(".")
-                if len(parts) <= max_depth:
-                    print(f"[Frozen   ] {name:60s} {tuple(param.shape)} -> {param.numel():,} params")
-
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-
-    print('number of params (M): %.2f' % (n_parameters / 1.e6))
-
     eff_batch_size = args.batch_size * args.accum_iter * misc.get_world_size()
     
     if args.lr is None:  # only base_lr is specified
@@ -369,8 +351,7 @@ def main(args):
             log_writer.add_scalar('perf/val_loss', val_stats['loss'], epoch)
             
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
-                        'epoch': epoch,
-                        'n_parameters': n_parameters}
+                        'epoch': epoch}
 
         if args.output_dir and misc.is_main_process():
             if log_writer is not None:
