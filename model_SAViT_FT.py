@@ -241,11 +241,10 @@ class MixPool(nn.Module):
 
         
         pooled_sum = pooled_sum.view(B, S2, D, S, S).mean(dim=(-1, -2))  # average spatial SxS (per spec eq. keeps S^2 length)
-        
-        # Lr-ViT over the mixed sequence
-        x = self.theta_mp(pooled_sum)     # [B, S^2, D]
+
+        x = self.theta_mp(pooled_sum)
         x = self.norm(x)
-        Z_out = x.mean(dim=1)             # final [B, D]
+        Z_out = x.mean(dim=1)       
         return Z_out
 
 
