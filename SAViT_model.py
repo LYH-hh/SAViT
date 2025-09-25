@@ -88,9 +88,6 @@ class LrMSA(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        x: [B, N, D]
-        """
         B, N, D = x.shape
         q = self.q_proj(x).view(B, N, self.num_heads, self.head_dim_qk).transpose(1, 2)  # [B,h,N,dq]
         k = self.k_proj(x).view(B, N, self.num_heads, self.head_dim_qk).transpose(1, 2)  # [B,h,N,dq]
@@ -140,11 +137,6 @@ class CrossAttention(nn.Module):
         self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, Z: torch.Tensor, AP: torch.Tensor) -> torch.Tensor:
-        """
-        Z:  [B, Lz, D]  (queries)
-        AP: [B, Lp, D]  (keys/values)
-        returns: [B, Lz, D]
-        """
         B, Lz, D = Z.shape
         Lp = AP.shape[1]
 
@@ -238,13 +230,9 @@ class MixPool(nn.Module):
         pooled_sum = torch.zeros(B * S2, D, S, S, device=Z_rg.device, dtype=Z_rg.dtype)
 
         if self.scales is None:
-            # Use 3 adaptive scales mapping KxK -> SxS (equation guarantees output length S^2)
-            # scale 1: direct adaptive average
             p1 = F.adaptive_avg_pool2d(Z_rg, (S, S))
-            # scale 2: pre-smooth with 3x3 then adaptive
             p2 = F.avg_pool2d(Z_rg, kernel_size=3, stride=1, padding=1)
             p2 = F.adaptive_avg_pool2d(p2, (S, S))
-            # scale 3: coarser 5x5 smoothing then adaptive
             p3 = F.avg_pool2d(Z_rg, kernel_size=5, stride=1, padding=2)
             p3 = F.adaptive_avg_pool2d(p3, (S, S))
             pooled_sum = p1 + p2 + p3
