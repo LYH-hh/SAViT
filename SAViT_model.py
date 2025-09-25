@@ -7,7 +7,6 @@ import torch.nn.functional as F
 
 
 class DropPath(nn.Module):
-    """Drop paths (Stochastic Depth) per sample (when applied in main path of residual layers)."""
     def __init__(self, drop_prob: float = 0.0):
         super().__init__()
         self.drop_prob = drop_prob
@@ -27,7 +26,6 @@ def trunc_normal_(tensor, std=0.02):
 
 
 def cosine_schedule(val_min: float, val_max: float, t: int, T: int) -> float:
-    """Cosine schedule in [val_min, val_max] for step t in [0, T-1]."""
     if T <= 1:
         return val_max
     cos_t = 0.5 * (1 + math.cos(math.pi * t / (T - 1)))
@@ -36,7 +34,6 @@ def cosine_schedule(val_min: float, val_max: float, t: int, T: int) -> float:
 
 
 class PatchEmbed(nn.Module):
-    """(B,C,H,W) -> (B, H'*W', D) with H'=H/P, W'=W/P."""
     def __init__(self, img_size=224, patch_size=16, in_chans=3, embed_dim=768):
         super().__init__()
         assert img_size % patch_size == 0, "img_size must be divisible by patch_size"
@@ -126,10 +123,6 @@ class LrViTBlock(nn.Module):
 
 
 class CrossAttention(nn.Module):
-    """
-    Q from Z_i (full dim), K,V from AP^i via linear projections.
-    Multi-head, standard dims (no reduction here; reduction happens in Lr-MSA later).
-    """
     def __init__(self, dim, num_heads=8, attn_drop=0.0, proj_drop=0.0):
         super().__init__()
         assert dim % num_heads == 0
@@ -218,8 +211,6 @@ class SPA(nn.Module):
                 AP_prev = x.detach()  
         return tilde
 
-# ---------------------- MixPool ----------------------
-
 class MixPool(nn.Module):
     def __init__(self, dim, num_heads, tau=4, mlp_ratio=4.0,
                  drop=0.0, attn_drop=0.0, drop_path=0.0,
@@ -230,10 +221,6 @@ class MixPool(nn.Module):
         self.scales = scales
 
     def forward(self, tilde_list: List[torch.Tensor], K: int) -> torch.Tensor:
-        """
-        tilde_list: length K^2, each [B, S^2, D]
-        returns Z_out: [B, D]
-        """
         K2 = len(tilde_list)
         B, S2, D = tilde_list[0].shape
         S = int(math.sqrt(S2))
@@ -262,21 +249,17 @@ class MixPool(nn.Module):
             p3 = F.adaptive_avg_pool2d(p3, (S, S))
             pooled_sum = p1 + p2 + p3
         else:
-            # Use explicit (kh, kw, sh, sw), then adapt to (S,S) if needed
             for (kh, kw, sh, sw) in self.scales:
                 out = F.avg_pool2d(Z_rg, kernel_size=(kh, kw), stride=(sh, sw), ceil_mode=False)
                 if out.shape[-2:] != (S, S):
                     out = F.adaptive_avg_pool2d(out, (S, S))
                 pooled_sum = pooled_sum + out
 
-        # Sum scales and reshape back to [B, S^2, D]
         pooled_sum = pooled_sum.view(B, S2, D, S, S).mean(dim=(-1, -2))  # average spatial SxS (per spec eq. keeps S^2 length)
-        # NOTE: each token index collects region-global context at multiple scales -> [B, S^2, D]
 
-        # Lr-ViT over the mixed sequence
-        x = self.theta_mp(pooled_sum)     # [B, S^2, D]
+        x = self.theta_mp(pooled_sum)     
         x = self.norm(x)
-        Z_out = x.mean(dim=1)             # final [B, D]
+        Z_out = x.mean(dim=1)             
         return Z_out
 
 
@@ -293,7 +276,7 @@ class SAViT(nn.Module):
                  mlp_ratio=4.0,
                  drop_rate=0.0,
                  attn_drop_rate=0.0,
-                 drop_path_rate=0.0,   # <--- 新增
+                 drop_path_rate=0.0,   
                  use_cross_attn=True,
                  num_classes=0, 
                  global_pool=False,
@@ -413,15 +396,3 @@ def SAViT_base_patch16(**kwargs):
     )
     return model
 
-# ---------------------- quick smoke test ----------------------
-'''if __name__ == "__main__":
-    torch.manual_seed(0)
-    model = SAViT(
-        img_size=224, patch_size=16, in_chans=3, embed_dim=384, num_heads=6,
-        K=2, spa_depth=2, tau=4, use_cross_attn=True
-    )
-    x = torch.randn(16, 3, 224, 224)
-    y = model(x)
-    print("Output shape:", y.shape)  # [2, 384]
-
-    count_parameters(model)'''
