@@ -111,7 +111,7 @@ def get_args_parser():
                         help='Use class token instead of global pool for classification')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/lyh/dataset/wellPrepared/chest-ray', type=str,
+    parser.add_argument('--data_path', default='', type=str,
                         help='dataset path')
     parser.add_argument('--nb_classes', default=2, type=int,
                         help='number of the classification types')
