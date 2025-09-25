@@ -10,17 +10,25 @@ This is the repo for the paper [A General Framework for Efficient Medical Image 
 
 **Training from scratch**
 ```bash
-python train_SAViT.py
+python train_SAViT.py \
+--data_path ./your_datasets/ \
+--nb_classes 5
 ```
 
 **Training PEFT**
 ```bash
-python train_PEFT.py
+python train_PEFT.py  \
+--data_path ./your_datasets/ \
+--nb_classes 5 \
+--finetune ./vit_base_patch16_224_in21k.pth
 ```
 
 **Training Full Fine-Tuning**
 ```bash
-python train_FT.py
+python train_FT.py \
+--data_path ./your_datasets/ \
+--nb_classes 5 \
+--finetune ./vit_base_patch16_224_in21k.pth
 ```
 
 ## 🙏 Acknowledgement
