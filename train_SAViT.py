@@ -105,7 +105,7 @@ def get_args_parser():
     # * Finetuning params
     parser.add_argument('--finetune', default='',type=str,
                         help='finetune from checkpoint')
-    parser.add_argument('--task', default='./output_dir/SAViT_scratch/base/ChildCXR/',type=str,
+    parser.add_argument('--task', default='./',type=str,
                         help='finetune from checkpoint')
     parser.add_argument('--global_pool', action='store_true')
     parser.set_defaults(global_pool=True)
@@ -113,14 +113,14 @@ def get_args_parser():
                         help='Use class token instead of global pool for classification')
 
     # Dataset parameters
-    parser.add_argument('--data_path', default='/lyh/dataset/wellPrepared/chest-ray', type=str,
+    parser.add_argument('--data_path', default='', type=str,
                         help='dataset path')
     parser.add_argument('--nb_classes', default=2, type=int,
                         help='number of the classification types')
 
-    parser.add_argument('--output_dir', default='./output_dir/SAViT_scratch/base/ChildCXR',
+    parser.add_argument('--output_dir', default='./',
                         help='path where to save, empty for no saving')
-    parser.add_argument('--log_dir', default='./output_dir/SAViT_scratch/base/ChildCXR/',
+    parser.add_argument('--log_dir', default='./',
                         help='path where to tensorboard log')
     parser.add_argument('--device', default='cuda',
                         help='device to use for training / testing')
